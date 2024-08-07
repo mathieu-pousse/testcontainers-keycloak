@@ -43,11 +43,7 @@ import java.security.SecureRandom;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Objects.requireNonNull;
@@ -73,6 +69,8 @@ public abstract class ExtendableKeycloakContainer<SELF extends ExtendableKeycloa
     private static final int DEFAULT_INITIAL_RAM_PERCENTAGE = 1;
     private static final int DEFAULT_MAX_RAM_PERCENTAGE = 5;
 
+    private static final String KEYCLOAK_START_DEV_COMMAND = "start-dev";
+    private static final String KEYCLOAK_START_PRODUCTION_COMMAND = "start";
     private static final String KEYCLOAK_ADMIN_USER = "admin";
     private static final String KEYCLOAK_ADMIN_PASSWORD = "admin";
     private static final String KEYCLOAK_CONTEXT_PATH = "";
@@ -86,6 +84,7 @@ public abstract class ExtendableKeycloakContainer<SELF extends ExtendableKeycloa
     private static final String KEYSTORE_FILE_IN_CONTAINER = KEYCLOAK_CONF_DIR + "/server.keystore";
     private static final String TRUSTSTORE_FILE_IN_CONTAINER = KEYCLOAK_CONF_DIR + "/server.truststore";
 
+    private String startupCommand = KEYCLOAK_START_DEV_COMMAND;
     private String adminUsername = KEYCLOAK_ADMIN_USER;
     private String adminPassword = KEYCLOAK_ADMIN_PASSWORD;
     private String contextPath = KEYCLOAK_CONTEXT_PATH;
@@ -144,7 +143,7 @@ public abstract class ExtendableKeycloakContainer<SELF extends ExtendableKeycloa
         if (useVerbose) {
             commandParts.add("--verbose");
         }
-        commandParts.add("start-dev");
+        commandParts.add(startupCommand);
 
         if (!contextPath.equals(KEYCLOAK_CONTEXT_PATH)) {
             withEnv("KC_HTTP_RELATIVE_PATH", contextPath);
@@ -204,9 +203,9 @@ public abstract class ExtendableKeycloakContainer<SELF extends ExtendableKeycloa
         if (providerClassLocations != null && !providerClassLocations.isEmpty()) {
             AtomicInteger index = new AtomicInteger(0);
             providerClassLocations.forEach(providerClassLocation -> createKeycloakExtensionDeployment(
-                DEFAULT_KEYCLOAK_PROVIDERS_LOCATION,
-                index.getAndIncrement() + "_" + DEFAULT_KEYCLOAK_PROVIDERS_NAME,
-                providerClassLocation
+                    DEFAULT_KEYCLOAK_PROVIDERS_LOCATION,
+                    index.getAndIncrement() + "_" + DEFAULT_KEYCLOAK_PROVIDERS_NAME,
+                    providerClassLocation
             ));
         }
 
@@ -250,9 +249,9 @@ public abstract class ExtendableKeycloakContainer<SELF extends ExtendableKeycloa
 
         if (customCommandParts != null) {
             logger().warn("You are using custom command parts. " +
-                "Container behavior and configuration may be corrupted. " +
-                "You are self responsible for proper behavior and functionality!\n" +
-                "CustomCommandParts: {}", customCommandParts);
+                    "Container behavior and configuration may be corrupted. " +
+                    "You are self responsible for proper behavior and functionality!\n" +
+                    "CustomCommandParts: {}", customCommandParts);
             commandParts.addAll(customCommandParts);
         }
 
@@ -323,10 +322,10 @@ public abstract class ExtendableKeycloakContainer<SELF extends ExtendableKeycloa
                 file.setReadable(true, false);
                 file.deleteOnExit();
                 ShrinkWrap.create(JavaArchive.class, extensionName)
-                    .as(ExplodedImporter.class)
-                    .importDirectory(classesLocation)
-                    .as(ZipExporter.class)
-                    .exportTo(file, true);
+                        .as(ExplodedImporter.class)
+                        .importDirectory(classesLocation)
+                        .as(ZipExporter.class)
+                        .exportTo(file, true);
                 withCopyFileToContainer(MountableFile.forHostPath(file.getAbsolutePath()), deploymentLocation + "/" + extensionName);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
@@ -337,10 +336,20 @@ public abstract class ExtendableKeycloakContainer<SELF extends ExtendableKeycloa
 
     protected String resolveExtensionClassLocation(String extensionClassFolder) {
         return Paths.get(MountableFile.forClasspathResource(".").getResolvedPath())
-            .getParent()
-            .getParent()
-            .resolve(extensionClassFolder)
-            .toString();
+                .getParent()
+                .getParent()
+                .resolve(extensionClassFolder)
+                .toString();
+    }
+
+    public SELF withProductionMode() {
+        this.startupCommand = KEYCLOAK_START_PRODUCTION_COMMAND;
+        return self();
+    }
+
+    public SELF withStartupCommand(String startupCommand) {
+        this.startupCommand = startupCommand;
+        return self();
     }
 
     public SELF withRealmImportFile(String importFile) {
@@ -501,7 +510,7 @@ public abstract class ExtendableKeycloakContainer<SELF extends ExtendableKeycloa
      * Enable remote debugging in Keycloak and expose it on a fixed port.
      *
      * @param hostPort The port on the host machine
-     * @param suspend Control if Keycloak should wait until a debugger is attached
+     * @param suspend  Control if Keycloak should wait until a debugger is attached
      */
     public SELF withDebugFixedPort(int hostPort, boolean suspend) {
         return withDebug(hostPort, suspend);
@@ -549,7 +558,7 @@ public abstract class ExtendableKeycloakContainer<SELF extends ExtendableKeycloa
     }
 
     public String getProtocol() {
-        return "http%s".formatted(useTls ? "s": "");
+        return "http%s".formatted(useTls ? "s" : "");
     }
 
     public String getAuthServerUrl() {
@@ -578,6 +587,7 @@ public abstract class ExtendableKeycloakContainer<SELF extends ExtendableKeycloa
 
     /**
      * Get the mapped port for remote debugging. Should only be used if debugging has been enabled.
+     *
      * @return the mapped port or <code>-1</code> if debugging has not been configured
      * @see #withDebug()
      * @see #withDebugFixedPort(int, boolean)
