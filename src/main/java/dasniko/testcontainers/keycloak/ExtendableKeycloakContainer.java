@@ -256,7 +256,17 @@ public abstract class ExtendableKeycloakContainer<SELF extends ExtendableKeycloa
             commandParts.addAll(customCommandParts);
         }
 
-        setCommand(commandParts.toArray(new String[0]));
+        setCommand(postProcessCommandParts(commandParts).toArray(new String[0]));
+    }
+
+    /**
+     * Use this if you need to manually adjust the Keycloak command before startup.
+     *
+     * @param commandParts the generated command parts
+     * @return the adjusted command parts
+     */
+    protected List<String> postProcessCommandParts(final List<String> commandParts) {
+        return commandParts;
     }
 
     @Override
